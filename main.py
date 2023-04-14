@@ -45,10 +45,6 @@ def myShuffle(seq):
     shuffle(seq2)
     return seq2
 
-
-    
-    
-
 def randPeople(names_M, names_G):
     k_priorities_M = [randint(1,len(names_G)) for name in names_M];
     k_priorities_G = [randint(1,len(names_M)) for name in names_G];
@@ -68,35 +64,66 @@ def randNames(nM,nG=-1):
     names_G = ["Pupil_G"+str(i) for i in range(nG)]
     return names_M,names_G
     
-def drawTmpEdges(B, pos, colorMap, edgesBold, edgesDashed):
-    plt.clf()
-    B.add_edges_from(edgesBold)
-    nx.draw(B, with_labels=True, font_weight='bold', pos=pos, node_color=colorMap, node_size=2000)
     
-    B.add_edges_from(edgesDashed)
-    nx.draw_networkx_edges(B,pos=pos,style='dashed')
-    plt.show(block=False)
-    B.remove_edges_from(edgesDashed)
-
-def blinkEdge(B, pos, colorMap,  edgesBold, edgesDashed1, edgeBlink):
-    edgesDashed = edgesDashed1.copy()
-    while(edgeBlink in edgesDashed):
-        edgesDashed.pop(edgesDashed.index(edgeBlink))
-    
-    for i in range(1,6):
-        plt.clf()
-        B.add_edges_from(edgesBold)
-        nx.draw(B, with_labels=True, font_weight='bold', pos=pos, node_color=colorMap, node_size=2000)
-    
-        B.add_edges_from(edgesDashed)
-        nx.draw_networkx_edges(B,pos=pos,style='dashed')
-        plt.pause(secFast)
+class myGraph():
+    def __init__(self, names_M, names_G, colors, pause, incoming_graph_data=None, **attr):
+        self.B = nx.Graph()
+        self.B.add_nodes_from(names_M, bipartite=0)
+        self.B.add_nodes_from(names_G, bipartite=1)
         
-        B.add_edge(*edgeBlink)
-        nx.draw_networkx_edges(B,pos=pos,style='dashed')
-        B.remove_edges_from(edgesDashed + [edgeBlink])
-        plt.pause(secFast)
+        pos = {}
+        pos.update((node, (1, index+1)) for index, node in enumerate(names_M))
+        pos.update((node, (2, index+1)) for index, node in enumerate(names_G))
+        self.pos = pos
+        
+        if(not colors):  
+            self.colorMap = ['#00A2E8' for node in names_M + names_G]
+        else:
+            self.colorMap=colors
+        self.constEdges = []        
+        self.pauseBlink = pause
     
+    def setPauseBlink(self, pause):
+        self.pauseBlink=pause
+    
+    def setVertexColor(self, vertex, color):
+        self.colorMap[list(self.B.nodes).index(vertex)] = color
+    
+    def addConstEdge(self, edge):
+        self.constEdges += [edge]
+        self.B.add_edges_from([edge])
+    
+    def draw(self):
+        plt.clf()
+        nx.draw(self.B, with_labels=True, font_weight='bold', pos=self.pos, node_color=self.colorMap, node_size=2000)
+        plt.show(block=False)
+    
+    def drawTmpEdges(self, edgesDashed):
+        plt.clf()
+        self.draw()        
+        self.B.add_edges_from(edgesDashed)
+        nx.draw_networkx_edges(self.B,pos=self.pos, style='dashed')
+        plt.show(block=False)
+        self.B.remove_edges_from(edgesDashed)
+    
+    def blinkEdge(self, edgesDashed1, edgeBlink, numOfBlink=3):
+        edgesDashed = edgesDashed1.copy()
+        while(edgeBlink in edgesDashed):
+            edgesDashed.pop(edgesDashed.index(edgeBlink))
+        
+        for i in range(1,numOfBlink):
+            plt.clf()
+            self.draw()            
+        
+            self.B.add_edges_from(edgesDashed)
+            nx.draw_networkx_edges(self.B,pos=self.pos,style='dashed')
+            plt.pause(self.pauseBlink)
+            
+            self.B.add_edge(*edgeBlink)
+            nx.draw_networkx_edges(self.B,pos=self.pos,style='dashed')
+            self.B.remove_edges_from(edgesDashed + [edgeBlink])
+            plt.pause(self.pauseBlink)
+        
     
     
      
@@ -116,14 +143,7 @@ for g in mass_G:
     waitPrint(g.selfDescribe(),secFast)
 waitPrint(sec=secFast)
 
-B = nx.Graph()
-B.add_nodes_from(names_M, bipartite=0)
-B.add_nodes_from(names_G, bipartite=1)
-pos = {}
-pos.update((node, (1, index+1)) for index, node in enumerate(names_M))
-pos.update((node, (2, index+1)) for index, node in enumerate(names_G))
-
-colorMap = ['#00A2E8' for node in B]
+B = myGraph(names_M, names_G, ['#00A2E8' for node in names_M + names_G], secFast)
 
 marriedList = []
 tmpEdges = []
@@ -140,16 +160,17 @@ while not (len(mass_G)==0 or len(mass_M)==0):
                 girl = [ g for g in mass_G if g.Name==girl_name][0]
                 if not boy.Name in girl.queue: girl.queue.append(boy.Name)
                 if not (boy.Name, girl_name) in tmpEdges: tmpEdges.append((boy.Name, girl_name)) # for graph
-                drawTmpEdges(B, pos, colorMap, marriedList,tmpEdges)
+                B.drawTmpEdges(tmpEdges)
                 waitPrint(boy.Name + " goes to "+girl.Name) # for console
                 break
             else:
                 boy.current_priority+=1
         if(boy.current_priority == len(boy.priorities)-1):
-            B.nodes[boy.Name]['color'] = 'red'
+            B.setVertexColor(boy.Name, 'red')
             waitPrint(f"{boy.Name} out")
-    drawTmpEdges(B, pos, colorMap, marriedList, tmpEdges) # for graph
+    B.drawTmpEdges(tmpEdges) # for graph
     waitPrint()
+    
     # girls answer
     for girl in mass_G:
         
@@ -169,8 +190,8 @@ while not (len(mass_G)==0 or len(mass_M)==0):
                     tmpEdges.pop(tmpEdges.index((boy.Name, girl.Name)))
                     
                     waitPrint(f"{girl.Name} say 'No' to {boy_name}",secFast)
-                    blinkEdge(B, pos, colorMap, marriedList,tmpEdges,(boy.Name,girl.Name))
-                    drawTmpEdges(B, pos, colorMap, marriedList, tmpEdges)
+                    B.blinkEdge(tmpEdges,(boy.Name,girl.Name))
+                    B.drawTmpEdges(tmpEdges)
                     
             
             else:
@@ -190,12 +211,13 @@ while not (len(mass_G)==0 or len(mass_M)==0):
                     girl.married = True
                     
                     waitPrint(f"{girl.Name} say 'Yes' to {boy.Name}, they married", secFast)
-                    blinkEdge(B, pos, colorMap, marriedList,tmpEdges,(boy.Name,girl.Name))
+                    B.blinkEdge(tmpEdges,(boy.Name,girl.Name))
                     tmpEdges.pop(tmpEdges.index((boy.Name, girl.Name)))
                     marriedList.append((boy.Name, girl.Name))
-                    colorMap[list(B.nodes).index(boy.Name)]='green' 
-                    colorMap[list(B.nodes).index(girl.Name)]='green' 
-                    drawTmpEdges(B, pos, colorMap, marriedList, tmpEdges)
+                    B.addConstEdge((boy.Name, girl.Name))
+                    B.setVertexColor(boy.Name, 'green')
+                    B.setVertexColor(girl.Name, 'green')
+                    B.drawTmpEdges(tmpEdges)
                     
                     girl.queue.pop(girl.queue.index(boy_name))
                     
@@ -206,14 +228,14 @@ while not (len(mass_G)==0 or len(mass_M)==0):
                             boy.current_priority+=1
                             
                             waitPrint(f"{girl.Name} say 'No' to {boy_name2}", secFast)
-                            blinkEdge(B, pos, colorMap, marriedList,tmpEdges,(boy.Name,girl.Name))
+                            B.blinkEdge(tmpEdges,(boy.Name,girl.Name))
                             tmpEdges.pop(tmpEdges.index((boy.Name, girl.Name)))
-                            drawTmpEdges(B, pos, colorMap, marriedList, tmpEdges)
+                            B.drawTmpEdges(tmpEdges)
                             
                     girl.queue.clear()
                 else:              
                     waitPrint(f"{girl.Name} say 'Wait' to {boy.Name}", secFast)
-                    blinkEdge(B, pos, colorMap, marriedList,tmpEdges,(boy.Name,girl.Name))
+                    B.blinkEdge(tmpEdges,(boy.Name,girl.Name))
             
             
             else:
@@ -225,19 +247,18 @@ while not (len(mass_G)==0 or len(mass_M)==0):
     
     for m in mass_M:
         if(m.current_priority==len(m.priorities)-1):
-            colorMap[list(B.nodes).index(m.Name)]='red'           
+            B.setVertexColor(m.Name, 'red')        
             waitPrint(f"{m.Name} out")
     for g in mass_G:
         if(g.current_priority==len(g.priorities)-1):
-            colorMap[list(B.nodes).index(g.Name)]='red' 
+            B.setVertexColor(g.Name, 'red')
             waitPrint(f"{g.Name} out")
     
     # deliting married (and out)
     mass_M = [m for m in mass_M if m.married==False and m.current_priority<len(m.priorities)-1]
     mass_G = [g for g in mass_G if g.married==False and g.current_priority<len(g.priorities)-1]
 
-    nx.draw(B, with_labels=True, font_weight='bold', pos=pos, node_color=colorMap, node_size=2000)
-    plt.show(block=False)
+    B.draw()
     plt.pause(1)
     
 
@@ -247,16 +268,15 @@ mass_G = mass_G_origin
 # set to -1 who not married
 for m in mass_M:
     if(not m.married):
-        colorMap[list(B.nodes).index(m.Name)]='red' 
+        B.setVertexColor(m.Name, 'red')
         m.current_priority=-1
 for g in mass_G:
     if(not g.married):
-        colorMap[list(B.nodes).index(g.Name)]='red' 
+        B.setVertexColor(g.Name, 'red')
         g.current_priority=-1
 
 
-nx.draw(B, with_labels=True, font_weight='bold', pos=pos, node_color=colorMap, node_size=2000)
-plt.show(block=False)
+B.draw()
 
 
 waitPrint("Results:",secFast)
