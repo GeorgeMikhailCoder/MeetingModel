@@ -180,13 +180,17 @@ while not (len(mass_G)==0 or len(mass_M)==0):
         waitPrint(f"{girl.Name} checkout priority {girl.current_priority}")
         
         # say 'no'
-        for boy_name in girl.queue:
+        i=-1
+        while i<len(girl.queue)-1:
+            i+=1
+            boy_name = girl.queue[i]
             if(boy_name in [m.Name for m in mass_M]):
                 boy = [ m for m in mass_M if m.Name==boy_name][0]
                 
                 if not boy_name in girl.priorities: 
                     boy.current_priority+=1
-                    girl.queue.pop(girl.queue.index(boy_name)) # correct mistake
+                    girl.queue.pop(i) # correct mistake
+                    i-=1
                     tmpEdges.pop(tmpEdges.index((boy.Name, girl.Name)))
                     
                     waitPrint(f"{girl.Name} say 'No' to {boy_name}",secFast)
