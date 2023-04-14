@@ -68,25 +68,25 @@ def randNames(nM,nG=-1):
     names_G = ["Pupil_G"+str(i) for i in range(nG)]
     return names_M,names_G
     
-def drawTmpEdges(B, pos,  edgesBold, edgesDashed):
+def drawTmpEdges(B, pos, colorMap, edgesBold, edgesDashed):
     plt.clf()
     B.add_edges_from(edgesBold)
-    nx.draw(B, with_labels=True, font_weight='bold', pos=pos,node_size=2000)
+    nx.draw(B, with_labels=True, font_weight='bold', pos=pos, node_color=colorMap, node_size=2000)
     
     B.add_edges_from(edgesDashed)
     nx.draw_networkx_edges(B,pos=pos,style='dashed')
     plt.show(block=False)
     B.remove_edges_from(edgesDashed)
 
-def blinkEdge(B,pos, edgesBold, edgesDashed1, edgeBlink):
+def blinkEdge(B, pos, colorMap,  edgesBold, edgesDashed1, edgeBlink):
     edgesDashed = edgesDashed1.copy()
-    if(edgeBlink in edgesDashed):
+    while(edgeBlink in edgesDashed):
         edgesDashed.pop(edgesDashed.index(edgeBlink))
     
     for i in range(1,6):
         plt.clf()
         B.add_edges_from(edgesBold)
-        nx.draw(B, with_labels=True, font_weight='bold', pos=pos,node_size=2000)
+        nx.draw(B, with_labels=True, font_weight='bold', pos=pos, node_color=colorMap, node_size=2000)
     
         B.add_edges_from(edgesDashed)
         nx.draw_networkx_edges(B,pos=pos,style='dashed')
@@ -120,32 +120,35 @@ B = nx.Graph()
 B.add_nodes_from(names_M, bipartite=0)
 B.add_nodes_from(names_G, bipartite=1)
 pos = {}
-pos.update((node, (1, index)) for index, node in enumerate(names_M))
-pos.update((node, (2, index)) for index, node in enumerate(names_G))
+pos.update((node, (1, index+1)) for index, node in enumerate(names_M))
+pos.update((node, (2, index+1)) for index, node in enumerate(names_G))
+
+colorMap = ['#00A2E8' for node in B]
 
 marriedList = []
+tmpEdges = []
 dayNum = 0
 while not (len(mass_G)==0 or len(mass_M)==0):
     dayNum+=1
     waitPrint(f"process, day {dayNum}")
     
-    # boys ask
-    tmpEdges = []
+    # boys ask    
     for boy in mass_M:
         while boy.current_priority < len(boy.priorities):
             girl_name = boy.priorities[boy.current_priority]
             if(girl_name in [g.Name for g in mass_G]):
                 girl = [ g for g in mass_G if g.Name==girl_name][0]
                 if not boy.Name in girl.queue: girl.queue.append(boy.Name)
-                tmpEdges.append((boy.Name, girl_name)) # for graph
-                drawTmpEdges(B,pos,marriedList,tmpEdges)
+                if not (boy.Name, girl_name) in tmpEdges: tmpEdges.append((boy.Name, girl_name)) # for graph
+                drawTmpEdges(B, pos, colorMap, marriedList,tmpEdges)
                 waitPrint(boy.Name + " goes to "+girl.Name) # for console
                 break
             else:
                 boy.current_priority+=1
         if(boy.current_priority == len(boy.priorities)-1):
+            B.nodes[boy.Name]['color'] = 'red'
             waitPrint(f"{boy.Name} out")
-    drawTmpEdges(B,pos,marriedList, tmpEdges) # for graph
+    drawTmpEdges(B, pos, colorMap, marriedList, tmpEdges) # for graph
     waitPrint()
     # girls answer
     for girl in mass_G:
@@ -164,8 +167,11 @@ while not (len(mass_G)==0 or len(mass_M)==0):
                     boy.current_priority+=1
                     girl.queue.pop(girl.queue.index(boy_name)) # correct mistake
                     tmpEdges.pop(tmpEdges.index((boy.Name, girl.Name)))
-                    drawTmpEdges(B,pos,marriedList, tmpEdges)
-                    waitPrint(f"{girl.Name} say 'No' to {boy_name}")
+                    
+                    waitPrint(f"{girl.Name} say 'No' to {boy_name}",secFast)
+                    blinkEdge(B, pos, colorMap, marriedList,tmpEdges,(boy.Name,girl.Name))
+                    drawTmpEdges(B, pos, colorMap, marriedList, tmpEdges)
+                    
             
             else:
                 waitPrint("Error")
@@ -183,9 +189,14 @@ while not (len(mass_G)==0 or len(mass_M)==0):
                     boy.married = True
                     girl.married = True
                     
+                    waitPrint(f"{girl.Name} say 'Yes' to {boy.Name}, they married", secFast)
+                    blinkEdge(B, pos, colorMap, marriedList,tmpEdges,(boy.Name,girl.Name))
+                    tmpEdges.pop(tmpEdges.index((boy.Name, girl.Name)))
                     marriedList.append((boy.Name, girl.Name))
-                    drawTmpEdges(B,pos,marriedList, tmpEdges)
-                    waitPrint(f"{girl.Name} say 'Yes' to {boy.Name}, they married")
+                    colorMap[list(B.nodes).index(boy.Name)]='green' 
+                    colorMap[list(B.nodes).index(girl.Name)]='green' 
+                    drawTmpEdges(B, pos, colorMap, marriedList, tmpEdges)
+                    
                     girl.queue.pop(girl.queue.index(boy_name))
                     
                     # Say no to other
@@ -194,13 +205,15 @@ while not (len(mass_G)==0 or len(mass_M)==0):
                             boy = [ m for m in mass_M if m.Name==boy_name2][0]
                             boy.current_priority+=1
                             
+                            waitPrint(f"{girl.Name} say 'No' to {boy_name2}", secFast)
+                            blinkEdge(B, pos, colorMap, marriedList,tmpEdges,(boy.Name,girl.Name))
                             tmpEdges.pop(tmpEdges.index((boy.Name, girl.Name)))
-                            drawTmpEdges(B,pos,marriedList, tmpEdges)
-                            waitPrint(f"{girl.Name} say 'No' to {boy_name2}")
+                            drawTmpEdges(B, pos, colorMap, marriedList, tmpEdges)
+                            
                     girl.queue.clear()
                 else:              
-                    waitPrint(f"{girl.Name} say 'Wait' to {boy.Name}")
-                    blinkEdge(B,pos,marriedList,tmpEdges,(boy.Name,girl.Name))
+                    waitPrint(f"{girl.Name} say 'Wait' to {boy.Name}", secFast)
+                    blinkEdge(B, pos, colorMap, marriedList,tmpEdges,(boy.Name,girl.Name))
             
             
             else:
@@ -212,16 +225,18 @@ while not (len(mass_G)==0 or len(mass_M)==0):
     
     for m in mass_M:
         if(m.current_priority==len(m.priorities)-1):
+            colorMap[list(B.nodes).index(m.Name)]='red'           
             waitPrint(f"{m.Name} out")
     for g in mass_G:
         if(g.current_priority==len(g.priorities)-1):
+            colorMap[list(B.nodes).index(g.Name)]='red' 
             waitPrint(f"{g.Name} out")
     
     # deliting married (and out)
     mass_M = [m for m in mass_M if m.married==False and m.current_priority<len(m.priorities)-1]
     mass_G = [g for g in mass_G if g.married==False and g.current_priority<len(g.priorities)-1]
-    B.add_edges_from(marriedList)
-    nx.draw(B, with_labels=True, font_weight='bold', pos=pos,node_size=2000)
+
+    nx.draw(B, with_labels=True, font_weight='bold', pos=pos, node_color=colorMap, node_size=2000)
     plt.show(block=False)
     plt.pause(1)
     
@@ -232,11 +247,16 @@ mass_G = mass_G_origin
 # set to -1 who not married
 for m in mass_M:
     if(not m.married):
+        colorMap[list(B.nodes).index(m.Name)]='red' 
         m.current_priority=-1
 for g in mass_G:
     if(not g.married):
+        colorMap[list(B.nodes).index(g.Name)]='red' 
         g.current_priority=-1
 
+
+nx.draw(B, with_labels=True, font_weight='bold', pos=pos, node_color=colorMap, node_size=2000)
+plt.show(block=False)
 
 
 waitPrint("Results:",secFast)
